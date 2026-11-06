@@ -1,0 +1,8 @@
+{
+  "appId": "com.airdrop.gestureshare",
+  "appName": "AirDrop",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}

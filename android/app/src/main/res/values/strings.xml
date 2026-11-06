@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AirDrop</string>
+    <string name="title_activity_main">AirDrop</string>
+    <string name="package_name">com.airdrop.gestureshare</string>
+    <string name="custom_url_scheme">com.airdrop.gestureshare</string>
+</resources>

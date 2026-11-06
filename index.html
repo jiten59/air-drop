@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101412">
+  <title>AirDrop | Gesture File Share</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101412;
+      --surface: #171d1a;
+      --surface-raised: #1c2420;
+      --line: #2b3730;
+      --muted: #98a69d;
+      --text: #edf4ee;
+      --green: #b9f36a;
+      --green-deep: #35551e;
+      --mint: #6ee7b7;
+      --amber: #ffd17a;
+      --red: #ff8e83;
+      --font: "Aptos", "Segoe UI Variable", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 10% 0%, rgba(93, 136, 67, .15), transparent 36rem),
+        linear-gradient(135deg, #111714, #101412 58%, #151b17);
+      color: var(--text);
+      font-family: var(--font);
+    }
+
+    button { font: inherit; }
+    .shell { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 30px 0 34px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 27px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #42553b; border-radius: 11px; background: #202b1d; color: var(--green); font-size: 20px; }
+    .brand-name { font-size: 16px; font-weight: 700; letter-spacing: .01em; }
+    .brand-sub { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .secure { display: inline-flex; align-items: center; gap: 8px; color: #b8c6bb; font-size: 12px; }
+    .secure-dot, .live-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px rgba(185, 243, 106, .55); }
+    .connection-panel { display: grid; grid-template-columns: minmax(180px, .75fr) minmax(0, 1.25fr); gap: 12px 20px; align-items: center; margin-bottom: 18px; padding: 14px 16px; }
+    .connection-title { font-size: 13px; font-weight: 700; }
+    .connection-help { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .connection-controls { display: flex; gap: 7px; min-width: 0; }
+    .room-code { width: 100%; min-width: 0; min-height: 38px; padding: 0 10px; border: 1px solid #3a493e; border-radius: 5px; background: #111814; color: var(--text); font: inherit; font-size: 13px; }
+    .room-code:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    .connection-controls .button { flex: none; }
+    .connection-status { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
+    .connection-status[data-connected="true"] { color: #a9e6c8; }
+    .peer-count { margin-left: auto; color: #d4e3d6; }
+
+    .workspace { display: grid; grid-template-columns: minmax(320px, .92fr) minmax(0, 1.08fr); gap: 18px; align-items: stretch; }
+    .panel { min-width: 0; border: 1px solid var(--line); border-radius: 9px; background: rgba(23, 29, 26, .94); box-shadow: 0 14px 45px rgba(0, 0, 0, .18); }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 62px; padding: 0 19px; border-bottom: 1px solid var(--line); }
+    .panel-title { font-size: 14px; font-weight: 650; }
+    .eyebrow { color: var(--muted); font-size: 11px; }
+    .camera-content { padding: 16px; }
+    .camera-stage { position: relative; overflow: hidden; width: 100%; aspect-ratio: 4 / 3; border: 1px solid #334139; border-radius: 6px; background: radial-gradient(ellipse at center, #1b2920, #101613 73%); }
+    #hand-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    #camera-video { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0; transition: opacity .2s ease; }
+    .camera-stage.has-camera #camera-video { opacity: 1; }
+    #grabbed-image { position: absolute; z-index: 2; width: min(88px, 18%); aspect-ratio: 1.16 / 1; border: 2px solid var(--green); border-radius: 5px; background: #101412; object-fit: contain; box-shadow: 0 5px 18px rgba(0, 0, 0, .55), 0 0 15px rgba(185, 243, 106, .42); pointer-events: none; transform: translate(-50%, -50%) rotate(-6deg); }
+    #grabbed-image[hidden] { display: none; }
+    .gesture-indicator { position: absolute; z-index: 3; top: 12px; right: 12px; padding: 7px 9px; border: 1px solid rgba(145, 170, 150, .2); border-radius: 4px; background: rgba(11, 16, 13, .82); color: #d9ff9d; font-size: 10px; font-weight: 700; }
+    .camera-corner { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px solid rgba(145, 170, 150, .2); border-radius: 4px; background: rgba(11, 16, 13, .76); color: #c9d5cb; font-size: 10px; letter-spacing: .02em; }
+    .camera-corner .live-dot { width: 6px; height: 6px; }
+    .stage-note { position: absolute; right: 12px; bottom: 10px; color: #7f9085; font-size: 10px; }
+    .camera-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; }
+    .camera-hint { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .camera-hint strong { color: #c9d5cb; font-weight: 550; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 0 13px; border: 1px solid #506a3e; border-radius: 5px; background: var(--green); color: #17210f; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .16s ease, transform .16s ease; }
+    .button[hidden] { display: none; }
+    .button:hover { background: #ccff86; transform: translateY(-1px); }
+    .button:disabled { cursor: wait; opacity: .72; transform: none; }
+    .button svg { width: 15px; height: 15px; }
+
+    .explorer-body { padding: 17px 18px 18px; }
+    .breadcrumb { display: flex; align-items: center; gap: 8px; margin: 1px 0 15px; color: var(--muted); font-size: 11px; }
+    .breadcrumb strong { color: #dce7dd; font-weight: 600; }
+    .explorer-toolbar { display: flex; justify-content: flex-end; margin: -4px 0 12px; }
+    .file-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+    .file-card { position: relative; min-width: 0; padding: 7px; border: 1px solid #313c35; border-radius: 6px; background: #1a211d; cursor: pointer; outline: none; transition: border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease; }
+    .file-card:hover, .file-card:focus-visible { border-color: #718a5a; background: #202a23; transform: translateY(-2px); }
+    .file-card.gesture-hovered { border-color: var(--green); box-shadow: 0 0 0 2px rgba(185, 243, 106, .14); }
+    .file-card.grabbed { border-color: var(--green); background: #263320; box-shadow: 0 0 0 2px rgba(185, 243, 106, .17), 0 0 26px rgba(185, 243, 106, .15); transform: translateY(-3px) scale(1.015); }
+    .file-card.sent { border-color: #55c796; }
+    .thumb { display: block; overflow: hidden; width: 100%; aspect-ratio: 1.16 / 1; border-radius: 3px; background: #29342d; }
+    .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+    .file-card:hover .thumb img { transform: scale(1.055); }
+    .file-info { display: flex; align-items: flex-start; justify-content: space-between; gap: 5px; padding: 10px 2px 4px; }
+    .file-name { overflow: hidden; color: #e3ebe4; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+    .file-size { margin-top: 4px; color: #87968b; font-size: 10px; }
+    .file-badge { display: none; flex: none; align-items: center; gap: 4px; padding: 4px 5px; border-radius: 3px; background: #3a5128; color: #d7ff9f; font-size: 9px; font-weight: 700; }
+    .grabbed .file-badge { display: inline-flex; }
+    .sent .file-badge { display: inline-flex; background: #183b2e; color: #8ce9bd; }
+    .transfer-preview { display: flex; align-items: center; gap: 12px; min-height: 78px; margin-top: 14px; padding: 8px; border: 1px solid #3a493e; border-radius: 5px; background: #141b17; }
+    .transfer-preview[hidden] { display: none; }
+    .transfer-preview img { display: block; width: 76px; height: 58px; flex: none; border-radius: 3px; background: #29342d; object-fit: cover; }
+    .transfer-preview-file, .file-placeholder { display: grid; place-items: center; flex: none; border: 1px solid #3b493f; border-radius: 3px; background: linear-gradient(145deg, #28352d, #19221c); color: var(--green); font-size: 11px; font-weight: 750; }
+    .transfer-preview-file { width: 76px; height: 58px; }
+    .file-placeholder { width: 100%; height: 100%; }
+    .file-placeholder[hidden], .transfer-preview-file[hidden] { display: none; }
+    .transfer-preview-copy { min-width: 0; }
+    .transfer-preview-name { overflow: hidden; color: #e3ebe4; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .transfer-preview-detail { margin-top: 4px; color: #98a69d; font-size: 10px; }
+    .transfer-preview-state { margin-left: auto; padding: 5px 7px; border-radius: 3px; background: #354b24; color: #d7ff9f; font-size: 9px; font-weight: 700; }
+    .transfer-send { min-height: 32px; margin-left: 8px; }
+    .transfer-save { min-height: 32px; }
+    .transfer-send[hidden] { display: none; }
+    .transfer-preview[data-state="sent"] .transfer-preview-state { background: #183b2e; color: #8ce9bd; }
+    .transfer-preview[data-state="ready"] .transfer-preview-state { background: #354b24; color: #d7ff9f; }
+    .empty-space { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding: 11px 12px; border: 1px dashed #354239; border-radius: 5px; color: #98a69d; font-size: 11px; }
+    .empty-space svg { width: 15px; height: 15px; flex: none; color: var(--green); }
+
+    .status-bar { display: flex; align-items: center; gap: 14px; min-height: 74px; margin-top: 18px; padding: 15px 18px; border: 1px solid #394638; border-left: 3px solid var(--green); border-radius: 6px; background: linear-gradient(100deg, #202a1b, #1a211c 58%); transition: border-color .18s ease, background .18s ease; }
+    .status-bar[data-mode="no-hand"] { border-left-color: #68756b; }
+    .status-bar[data-mode="grabbed"] { border-color: #566f3c; border-left-color: var(--green); background: linear-gradient(100deg, #29371f, #1b241c 67%); }
+    .status-bar[data-mode="sent"] { border-color: #37684f; border-left-color: var(--mint); background: linear-gradient(100deg, #1b3528, #19221d 67%); }
+    .status-icon { display: grid; place-items: center; width: 38px; height: 38px; flex: none; border: 1px solid #4b5b43; border-radius: 50%; background: #263321; font-size: 19px; }
+    .status-copy { min-width: 0; }
+    .status-title { font-size: 14px; font-weight: 700; }
+    .status-detail { margin-top: 4px; color: #a5b2a8; font-size: 11px; }
+    .status-right { margin-left: auto; color: #93a295; font-size: 10px; text-align: right; }
+    .status-right strong { display: block; margin-bottom: 4px; color: #d5e2d7; font-size: 10px; font-weight: 600; }
+    .footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; color: #718076; font-size: 10px; }
+    .footer span:last-child { text-align: right; }
+    #particle-canvas { position: fixed; z-index: 5; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+      .send-preview { position: fixed; z-index: 6; object-fit: cover; border: 2px solid rgba(217, 255, 157, .9); border-radius: 6px; box-shadow: 0 12px 45px rgba(0, 0, 0, .55), 0 0 24px rgba(185, 243, 106, .3); pointer-events: none; }
+
+    @media (max-width: 760px) {
+      .shell { width: min(560px, calc(100% - 28px)); padding-top: 20px; }
+      .connection-panel { grid-template-columns: 1fr; gap: 9px; margin-bottom: 13px; }
+      .connection-status { grid-column: auto; }
+      .workspace { grid-template-columns: 1fr; gap: 13px; }
+      .topbar { margin-bottom: 17px; }
+      .camera-content { padding: 12px; }
+      .panel-head { min-height: 54px; }
+      .status-bar { margin-top: 13px; }
+    }
+    @media (max-width: 430px) {
+      .shell { width: calc(100% - 22px); }
+      .connection-panel { padding: 12px; }
+      .connection-controls { flex-wrap: wrap; }
+      .connection-controls .room-code { flex: 1 1 100%; }
+      .connection-controls .button { flex: 1; min-height: 40px; }
+      .peer-count { margin-left: 0; }
+      .file-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .file-card { padding: 5px; }
+      .file-name { font-size: 10px; }
+      .file-size { font-size: 9px; }
+      .camera-controls { align-items: stretch; flex-direction: column; }
+      .camera-hint { max-width: none; }
+      .camera-controls .button { width: 100%; min-height: 42px; }
+      .transfer-preview { gap: 8px; }
+      .transfer-preview img { width: 56px; height: 48px; }
+      .transfer-send { margin-left: 0; }
+      .transfer-save { margin-left: auto; }
+      .status-right { display: none; }
+      .footer { flex-direction: column; }
+      .footer span:last-child { text-align: left; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+  <!-- Camera Utilities -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <!-- Hands Core -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">↗</div>
+        <div>
+          <div class="brand-name">AirDrop</div>
+          <div class="brand-sub">Gesture file sharing</div>
+        </div>
+      </div>
+      <div class="secure"><span class="secure-dot" aria-hidden="true"></span><span>Local camera processing</span></div>
+    </header>
+
+    <section class="panel connection-panel" aria-labelledby="connection-heading">
+      <div>
+        <div class="connection-title" id="connection-heading">Transfer between devices</div>
+        <div class="connection-help">Use the same room code on both devices. Keep the code private.</div>
+      </div>
+      <div class="connection-controls">
+        <label class="sr-only" for="room-code">Shared room code</label>
+        <input class="room-code" id="room-code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="20" placeholder="Enter room code">
+        <button class="button" id="copy-room-code" type="button" title="Copy room code" aria-label="Copy room code">Copy code</button>
+        <button class="button" id="connect-room" type="button">Connect</button>
+        <button class="button" id="disconnect-room" type="button" hidden>Disconnect</button>
+      </div>
+      <div class="connection-status" id="connection-status" role="status" aria-live="polite" data-connected="false">
+        <span class="secure-dot" aria-hidden="true"></span>
+        <span id="connection-detail">Create or enter a shared code to find the other device.</span>
+        <strong class="peer-count" id="peer-count">No devices</strong>
+      </div>
+    </section>
+
+    <section class="workspace" aria-label="Gesture sharing workspace">
+      <section class="panel" aria-labelledby="camera-heading">
+        <div class="panel-head">
+          <div class="panel-title" id="camera-heading">Hand tracking</div>
+          <div class="eyebrow" id="camera-state">Camera offline</div>
+        </div>
+        <div class="camera-content">
+          <div class="camera-stage">
+            <video id="camera-video" playsinline muted></video>
+            <canvas id="hand-canvas" width="640" height="480" aria-label="Live hand landmark visualization"></canvas>
+            <img id="grabbed-image" alt="" aria-hidden="true" hidden>
+            <div class="gesture-indicator" id="gesture-indicator" aria-live="polite">NO HAND</div>
+            <div class="camera-corner"><span class="live-dot" id="camera-live-dot" aria-hidden="true"></span><span id="camera-live-label">CAMERA STANDBY</span></div>
+            <div class="stage-note">640 × 480 · mirrored tracking</div>
+          </div>
+          <div class="camera-controls">
+            <div class="camera-hint"><strong>Tap an image</strong> and use Send, or move your hand to select; <strong>✊ fist</strong> grabs, <strong>✋ open palm</strong> sends.</div>
+            <button class="button" id="camera-button" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8"/><path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+              <span>Enable camera</span>
+            </button>
+          </div>
+          <p class="sr-only" id="camera-error" role="status"></p>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="explorer-heading">
+        <div class="panel-head">
+          <div class="panel-title" id="explorer-heading">File Explorer</div>
+          <div class="eyebrow" id="file-count">3 items</div>
+        </div>
+        <div class="explorer-body">
+          <div class="breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><strong>Pictures</strong></div>
+          <div class="explorer-toolbar">
+            <input id="image-input" type="file" multiple hidden>
+            <button class="button" id="add-images-button" type="button" aria-label="Add files from your device">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              <span>Add files</span>
+            </button>
+          </div>
+          <div class="file-grid" id="file-grid">
+            <article class="file-card" data-file="image-1" role="button" tabindex="0" aria-label="Image 1, 2.4 megabytes. Tap to select, then use Send.">
+              <div class="thumb"><img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=crop&amp;w=480&amp;h=420&amp;q=80" alt="Mountain lake beneath a sunrise" loading="lazy"></div>
+              <div class="file-info"><div><div class="file-name">Image 1.jpg</div><div class="file-size">2.4 MB · JPG</div></div><span class="file-badge" aria-live="polite">GRABBED</span></div>
+            </article>
+            <article class="file-card" data-file="image-2" role="button" tabindex="0" aria-label="Image 2, 1.8 megabytes. Tap to select, then use Send.">
+              <div class="thumb"><img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&amp;fit=crop&amp;w=480&amp;h=420&amp;q=80" alt="Sunlit green landscape and hills" loading="lazy"></div>
+              <div class="file-info"><div><div class="file-name">Image 2.jpg</div><div class="file-size">1.8 MB · JPG</div></div><span class="file-badge" aria-live="polite">GRABBED</span></div>
+            </article>
+            <article class="file-card" data-file="image-3" role="button" tabindex="0" aria-label="Image 3, 3.1 megabytes. Tap to select, then use Send.">
+              <div class="thumb"><img src="https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&amp;fit=crop&amp;w=480&amp;h=420&amp;q=80" alt="Golden light over a quiet field" loading="lazy"></div>
+              <div class="file-info"><div><div class="file-name">Image 3.jpg</div><div class="file-size">3.1 MB · JPG</div></div><span class="file-badge" aria-live="polite">GRABBED</span></div>
+            </article>
+          </div>
+          <div class="transfer-preview" id="transfer-preview" hidden aria-live="polite">
+            <img id="transfer-preview-image" alt="">
+            <div class="transfer-preview-file" id="transfer-preview-file" hidden aria-hidden="true"></div>
+            <div class="transfer-preview-copy">
+              <div class="transfer-preview-name" id="transfer-preview-name"></div>
+              <div class="transfer-preview-detail" id="transfer-preview-detail"></div>
+            </div>
+            <span class="transfer-preview-state" id="transfer-preview-state">GRABBED</span>
+            <button class="button transfer-save" id="save-received-file" type="button" hidden>Save / share</button>
+            <button class="button transfer-send" id="transfer-send-button" type="button" hidden>Send</button>
+          </div>
+          <div class="empty-space">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 17v3h14v-3"/></svg>
+            <span>Send selected files directly to connected devices.</span>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="status-bar" id="gesture-status" data-mode="no-hand" aria-live="polite" aria-atomic="true">
+      <div class="status-icon" id="status-icon" aria-hidden="true">◎</div>
+      <div class="status-copy">
+        <div class="status-title" id="status-title">No Hand Detected</div>
+        <div class="status-detail" id="status-detail">Enable the camera and place your hand in view.</div>
+      </div>
+      <div class="status-right"><strong>GESTURE STATUS</strong><span id="status-hint">Waiting for camera</span></div>
+    </section>
+    <footer class="footer"><span>Peer discovery needs internet. File data is sent directly between connected devices.</span><span>Camera access is optional.</span></footer>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const video = document.getElementById("camera-video");
+      const cameraStage = document.querySelector(".camera-stage");
+      const handCanvas = document.getElementById("hand-canvas");
+      const handCtx = handCanvas.getContext("2d");
+      const grabbedImage = document.getElementById("grabbed-image");
+      const gestureIndicator = document.getElementById("gesture-indicator");
+      const particleCanvas = document.getElementById("particle-canvas");
+      const particleCtx = particleCanvas.getContext("2d");
+      const cameraButton = document.getElementById("camera-button");
+      const cameraState = document.getElementById("camera-state");
+      const cameraLiveLabel = document.getElementById("camera-live-label");
+      const cameraLiveDot = document.getElementById("camera-live-dot");
+      const cameraError = document.getElementById("camera-error");
+      const statusBar = document.getElementById("gesture-status");
+      const statusTitle = document.getElementById("status-title");
+      const statusDetail = document.getElementById("status-detail");
+      const statusHint = document.getElementById("status-hint");
+      const statusIcon = document.getElementById("status-icon");
+      const fileGrid = document.getElementById("file-grid");
+      const fileCount = document.getElementById("file-count");
+      const imageInput = document.getElementById("image-input");
+      const addImagesButton = document.getElementById("add-images-button");
+      const transferPreview = document.getElementById("transfer-preview");
+      const transferPreviewImage = document.getElementById("transfer-preview-image");
+      const transferPreviewName = document.getElementById("transfer-preview-name");
+      const transferPreviewDetail = document.getElementById("transfer-preview-detail");
+      const transferPreviewState = document.getElementById("transfer-preview-state");
+      const transferSendButton = document.getElementById("transfer-send-button");
+      const saveReceivedFileButton = document.getElementById("save-received-file");
+      const transferPreviewFile = document.getElementById("transfer-preview-file");
+      const roomCodeInput = document.getElementById("room-code");
+      const copyRoomCodeButton = document.getElementById("copy-room-code");
+      const connectRoomButton = document.getElementById("connect-room");
+      const disconnectRoomButton = document.getElementById("disconnect-room");
+      const connectionStatus = document.getElementById("connection-status");
+      const connectionDetail = document.getElementById("connection-detail");
+      const peerCount = document.getElementById("peer-count");
+      let fileCards = [...document.querySelectorAll(".file-card")];
+      const fileContents = new WeakMap();
+      const peers = new Set();
+      const pendingTransfers = new Map();
+      const maxTransferBytes = 100 * 1024 * 1024;
+      const width = handCanvas.width;
+      const height = handCanvas.height;
+      const fingerJoints = [[8, 6], [12, 10], [16, 14], [20, 18]];
+      const handConnections = [
+        [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8],
+        [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15],
+        [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]
+      ];
+
+      let hands = null;
+      let camera = null;
+      let cameraStream = null;
+      let hoveredCard = null;
+      let gestureHoveredCard = null;
+      let grabbedCard = null;
+      let activeFileCard = null;
+      let lastGesture = "none";
+      let pendingGesture = "none";
+      let pendingGestureFrames = 0;
+      let stableGesture = "none";
+      let sentResetTimer = null;
+      let particles = [];
+      let particleFrame = 0;
+      let cameraStarting = false;
+      let transferRoom = null;
+      let fileAction = null;
+      let receiptAction = null;
+      let transferInProgress = false;
+
+      function setStatus(mode, title, detail, hint, icon) {
+        statusBar.dataset.mode = mode;
+        statusTitle.textContent = title;
+        statusDetail.textContent = detail;
+        statusHint.textContent = hint;
+        statusIcon.textContent = icon;
+      }
+
+      function getFileName(card) {
+        return card?.querySelector(".file-name")?.textContent || "File";
+      }
+
+      function formatFileSize(bytes) {
+        return bytes < 1024 * 1024
+          ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+          : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+
+      async function getFileContents(card) {
+        const existingFile = fileContents.get(card);
+        if (existingFile) return existingFile;
+        const image = card.querySelector(".thumb img");
+        if (!image) throw new Error("This file is no longer available.");
+        const response = await fetch(image.currentSrc || image.src);
+        if (!response.ok) throw new Error("Could not load this sample image.");
+        const blob = await response.blob();
+        const file = new File([blob], getFileName(card), { type: blob.type || "image/jpeg" });
+        fileContents.set(card, file);
+        return file;
+      }
+
+      function createFileCard(file) {
+        const card = document.createElement("article");
+        card.className = "file-card";
+        card.dataset.file = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        card.setAttribute("role", "button");
+        card.tabIndex = 0;
+        card.setAttribute("aria-label", `${file.name}, ${formatFileSize(file.size)}. Tap to select, then use Send.`);
+        fileContents.set(card, file);
+
+        const thumbnail = document.createElement("div");
+        thumbnail.className = "thumb";
+        if (file.type.startsWith("image/")) {
+          const image = document.createElement("img");
+          image.src = URL.createObjectURL(file);
+          image.alt = file.name;
+          thumbnail.append(image);
+        } else {
+          const placeholder = document.createElement("div");
+          placeholder.className = "file-placeholder";
+          placeholder.textContent = file.name.split(".").pop().slice(0, 5).toUpperCase();
+          thumbnail.append(placeholder);
+        }
+
+        const info = document.createElement("div");
+        info.className = "file-info";
+        const metadata = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "file-name";
+        name.textContent = file.name;
+        const size = document.createElement("div");
+        size.className = "file-size";
+        size.textContent = `${formatFileSize(file.size)} · ${file.type.split("/")[1]?.toUpperCase() || file.name.split(".").pop().toUpperCase() || "FILE"}`;
+        metadata.append(name, size);
+        const badge = document.createElement("span");
+        badge.className = "file-badge";
+        badge.setAttribute("aria-live", "polite");
+        badge.textContent = "GRABBED";
+        info.append(metadata, badge);
+        card.append(thumbnail, info);
+        return card;
+      }
+
+      function showTransferPreview(card, state) {
+        const image = card.querySelector(".thumb img");
+        transferPreviewImage.hidden = !image;
+        transferPreviewFile.hidden = Boolean(image);
+        if (image) {
+          transferPreviewImage.src = image.currentSrc || image.src;
+          transferPreviewImage.alt = getFileName(card);
+        } else {
+          transferPreviewImage.removeAttribute("src");
+          transferPreviewImage.alt = "";
+          transferPreviewFile.textContent = getFileName(card).split(".").pop().slice(0, 5).toUpperCase();
+        }
+        transferPreviewName.textContent = getFileName(card);
+        transferPreviewDetail.textContent = state === "sent"
+          ? "Delivered to connected devices."
+          : state === "received"
+            ? "Received from another device."
+            : state === "sending"
+              ? "Sending directly to connected devices…"
+          : state === "grabbed"
+            ? "Selected and ready to send."
+            : state === "ready"
+              ? "Ready to send again."
+              : "Select this file to send it.";
+        transferPreviewState.textContent = state === "sent" ? "SENT" : state === "received" ? "RECEIVED" : state === "sending" ? "SENDING" : state === "grabbed" ? "SELECTED" : state === "ready" ? "READY" : "PREVIEW";
+        transferSendButton.hidden = state !== "grabbed";
+        transferSendButton.disabled = peers.size === 0 || transferInProgress;
+        saveReceivedFileButton.hidden = !fileContents.has(card);
+        transferPreview.dataset.state = state;
+        transferPreview.hidden = false;
+      }
+
+      function updateGestureTarget(landmarks) {
+        gestureHoveredCard = landmarks
+          ? fileCards[Math.max(0, Math.min(fileCards.length - 1, Math.floor((1 - landmarks[9].x) * fileCards.length)))]
+          : null;
+        const targetCard = hoveredCard || gestureHoveredCard;
+        for (const card of fileCards) {
+          card.classList.toggle("gesture-hovered", card === targetCard);
+        }
+        if (targetCard && !grabbedCard && activeFileCard !== targetCard) {
+          activeFileCard = targetCard;
+          showTransferPreview(targetCard, "preview");
+        }
+      }
+
+      function clearCardClasses() {
+        for (const card of fileCards) {
+          card.classList.remove("grabbed", "sent");
+          card.querySelector(".file-badge").textContent = "GRABBED";
+        }
+      }
+
+      function resetSentCard(card) {
+        if (card.classList.contains("sent")) card.classList.remove("sent");
+      }
+
+      function grabCard(card) {
+        if (!card) return;
+        if (sentResetTimer) {
+          clearTimeout(sentResetTimer);
+          sentResetTimer = null;
+        }
+        clearCardClasses();
+        card.classList.add("grabbed");
+        grabbedCard = card;
+        activeFileCard = card;
+        const image = card.querySelector(".thumb img");
+        grabbedImage.hidden = !image;
+        if (image) grabbedImage.src = image.currentSrc || image.src;
+        showTransferPreview(card, "grabbed");
+        setStatus("grabbed", "File selected", `${getFileName(card)} is ready to send to connected devices.`, "File selected", "✊");
+      }
+
+      function waitForReceipts(transferId, recipientIds) {
+        let finish;
+        const promise = new Promise((resolve) => {
+          const expected = new Set(recipientIds);
+          const received = new Set();
+          const timeout = setTimeout(() => finish(false), 60000);
+          finish = (delivered) => {
+            clearTimeout(timeout);
+            pendingTransfers.delete(transferId);
+            resolve(delivered);
+          };
+          pendingTransfers.set(transferId, {
+            expected,
+            received,
+            finish: (delivered) => finish(delivered),
+            complete: () => {
+              if ([...expected].every((peerId) => received.has(peerId))) finish(true);
+            }
+          });
+        });
+        return { promise, cancel: () => pendingTransfers.get(transferId)?.finish(false) };
+      }
+
+      async function sendCard(card) {
+        if (!card || transferInProgress) return;
+        if (!transferRoom || peers.size === 0) {
+          setStatus("other", "Connect another device", "Join the same room code on both devices before sending.", "No receiving device", "◎");
+          return;
+        }
+
+        transferInProgress = true;
+        transferSendButton.disabled = true;
+        transferSendButton.textContent = "Sending";
+        const recipientIds = [...peers];
+        let receiptWait = null;
+        try {
+          const file = await getFileContents(card);
+          if (file.size > maxTransferBytes) throw new Error("Files must be 100 MB or smaller.");
+          const transferId = crypto.randomUUID();
+          receiptWait = waitForReceipts(transferId, recipientIds);
+          showTransferPreview(card, "sending");
+          await fileAction.send(await file.arrayBuffer(), {
+            target: recipientIds,
+            metadata: { transferId, name: file.name, type: file.type || "application/octet-stream" },
+            onProgress: (progress) => {
+              transferPreviewDetail.textContent = `Sending to ${recipientIds.length} device${recipientIds.length === 1 ? "" : "s"} · ${Math.round(progress * 100)}%`;
+            }
+          });
+          const delivered = await receiptWait.promise;
+          if (!delivered) throw new Error("Delivery was not confirmed. Check that the other device is still connected.");
+
+          card.classList.remove("grabbed");
+          card.classList.add("sent");
+          grabbedImage.hidden = true;
+          card.querySelector(".file-badge").textContent = "SENT";
+          grabbedCard = null;
+          activeFileCard = card;
+          showTransferPreview(card, "sent");
+          if (card.querySelector(".thumb img")) {
+            animateSentPhoto(card);
+            spawnBurst(card);
+          }
+          setStatus("sent", "File delivered", `${file.name} was received by ${recipientIds.length} device${recipientIds.length === 1 ? "" : "s"}.`, "Delivery confirmed", "✓");
+          if (sentResetTimer) clearTimeout(sentResetTimer);
+          sentResetTimer = setTimeout(() => {
+            card.classList.remove("sent");
+            card.querySelector(".file-badge").textContent = "GRABBED";
+            sentResetTimer = null;
+            showTransferPreview(card, "ready");
+          }, 2400);
+        } catch (error) {
+          receiptWait?.cancel();
+          showTransferPreview(card, "grabbed");
+          setStatus("other", "Transfer failed", error?.message || "Could not send this file.", "Try again", "!");
+        } finally {
+          transferInProgress = false;
+          transferSendButton.textContent = "Send";
+          transferSendButton.disabled = peers.size === 0;
+        }
+      }
+
+      function generateRoomCode() {
+        const alphabet = "23456789abcdefghjkmnpqrstuvwxyz";
+        const random = crypto.getRandomValues(new Uint8Array(12));
+        return [...random].map((value) => alphabet[value % alphabet.length]).join("");
+      }
+
+      function updatePeerStatus(message) {
+        const count = peers.size;
+        connectionStatus.dataset.connected = String(count > 0);
+        peerCount.textContent = count ? `${count} device${count === 1 ? "" : "s"} connected` : "No devices";
+        if (message) connectionDetail.textContent = message;
+        transferSendButton.disabled = count === 0 || transferInProgress;
+      }
+
+      function safeFileName(name) {
+        return String(name || "shared-file").replace(/[\\/\u0000-\u001f]/g, "_").slice(0, 180) || "shared-file";
+      }
+
+      function addReceivedFile(data, metadata, peerId) {
+        const fileName = safeFileName(metadata?.name);
+        const fileType = typeof metadata?.type === "string" ? metadata.type : "application/octet-stream";
+        const file = new File([data], fileName, { type: fileType });
+        const card = createFileCard(file);
+        fileGrid.append(card);
+        bindFileCard(card);
+        fileCards = [...fileGrid.querySelectorAll(".file-card")];
+        fileCount.textContent = `${fileCards.length} items`;
+        activeFileCard = card;
+        showTransferPreview(card, "received");
+        connectionDetail.textContent = `Received ${fileName} from a connected device.`;
+        setStatus("sent", "File received", `${fileName} is now available in this device's explorer.`, "Receive complete", "↓");
+        receiptAction.send({ transferId: metadata.transferId, accepted: true }, { target: peerId });
+      }
+
+      async function connectToRoom() {
+        const roomId = roomCodeInput.value.trim().toLowerCase();
+        if (!/^[a-z0-9]{6,20}$/.test(roomId)) {
+          updatePeerStatus("Enter a room code between 6 and 20 letters or numbers.");
+          roomCodeInput.focus();
+          return;
+        }
+        connectRoomButton.disabled = true;
+        connectionDetail.textContent = "Connecting to peer discovery…";
+        try {
+          const { joinRoom } = await import("https://esm.run/trystero@0.26.0");
+          transferRoom = joinRoom({ appId: "com.airdrop.gestureshare" }, roomId);
+          fileAction = transferRoom.makeAction("airdrop-file-v1", {
+            onReceive: ({ byteLength, metadata }) => {
+              if (byteLength > maxTransferBytes) return false;
+              const fileName = safeFileName(metadata?.name);
+              return window.confirm(`Accept ${fileName} (${formatFileSize(byteLength)})?`);
+            }
+          });
+          receiptAction = transferRoom.makeAction("airdrop-receipt-v1");
+          fileAction.onMessage = (data, { peerId, metadata }) => {
+            if (peers.has(peerId) && metadata?.transferId) addReceivedFile(data, metadata, peerId);
+          };
+          fileAction.onReceiveProgress = (progress, { metadata }) => {
+            connectionDetail.textContent = `Receiving ${safeFileName(metadata?.name)} · ${Math.round(progress * 100)}%`;
+          };
+          receiptAction.onMessage = ({ transferId, accepted }, { peerId }) => {
+            const transfer = pendingTransfers.get(transferId);
+            if (!transfer || !accepted || !transfer.expected.has(peerId)) return;
+            transfer.received.add(peerId);
+            transfer.complete();
+          };
+          transferRoom.onPeerJoin = (peerId) => {
+            peers.add(peerId);
+            updatePeerStatus("Connected. Select a file to send it directly to this device.");
+          };
+          transferRoom.onPeerLeave = (peerId) => {
+            peers.delete(peerId);
+            updatePeerStatus(peers.size ? "A device disconnected." : "Waiting for another device to join this room.");
+          };
+          connectRoomButton.hidden = true;
+          disconnectRoomButton.hidden = false;
+          updatePeerStatus(`Waiting for another device in room ${roomId}.`);
+        } catch (error) {
+          if (transferRoom) transferRoom.leave();
+          transferRoom = null;
+          connectionDetail.textContent = error?.message || "Could not connect. Check your internet connection and try again.";
+          connectRoomButton.disabled = false;
+        }
+      }
+
+      function disconnectFromRoom() {
+        transferRoom?.leave();
+        transferRoom = null;
+        fileAction = null;
+        receiptAction = null;
+        peers.clear();
+        for (const transfer of pendingTransfers.values()) transfer.finish(false);
+        connectRoomButton.hidden = false;
+        connectRoomButton.disabled = false;
+        disconnectRoomButton.hidden = true;
+        updatePeerStatus("Disconnected. Rejoin the same room code to transfer files.");
+      }
+
+      async function copyRoomCode() {
+        try {
+          await navigator.clipboard.writeText(roomCodeInput.value);
+          connectionDetail.textContent = "Room code copied. Share it with the other device.";
+        } catch {
+          roomCodeInput.select();
+          document.execCommand("copy");
+          connectionDetail.textContent = "Room code selected. Copy and share it with the other device.";
+        }
+      }
+
+      async function saveReceivedFile() {
+        const file = activeFileCard && fileContents.get(activeFileCard);
+        if (!file) return;
+        try {
+          if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file], title: file.name });
+            return;
+          }
+          const url = URL.createObjectURL(file);
+          const download = document.createElement("a");
+          download.href = url;
+          download.download = safeFileName(file.name);
+          download.click();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (error) {
+          if (error?.name !== "AbortError") {
+            setStatus("other", "Could not save file", error?.message || "Try sharing the file again.", "Save failed", "!");
+          }
+        }
+      }
+
+      function classifyHand(landmarks) {
+        if (!landmarks || landmarks.length < 21) return "none";
+        const wrist = landmarks[0];
+        const curledFingers = fingerJoints.reduce((count, [tipIndex, pipIndex]) => {
+          const tip = landmarks[tipIndex];
+          const pip = landmarks[pipIndex];
+          const tipDistance = Math.hypot((tip.x - wrist.x) * width, (tip.y - wrist.y) * height);
+          const pipDistance = Math.hypot((pip.x - wrist.x) * width, (pip.y - wrist.y) * height);
+          return count + (tipDistance < pipDistance * 1.08 ? 1 : 0);
+        }, 0);
+        if (curledFingers >= 3) return "closed";
+        if (curledFingers <= 1) return "open";
+        return "other";
+      }
+
+      function stabilizeGesture(gesture) {
+        if (gesture === pendingGesture) pendingGestureFrames++;
+        else {
+          pendingGesture = gesture;
+          pendingGestureFrames = 1;
+        }
+        if (pendingGestureFrames >= 3) stableGesture = gesture;
+        return pendingGestureFrames >= 3 ? stableGesture : stableGesture === "none" ? null : stableGesture;
+      }
+
+        function animateSentPhoto(card) {
+          const sourceImage = card.querySelector(".thumb img");
+          if (!sourceImage) return;
+          const rect = sourceImage.getBoundingClientRect();
+          const preview = document.createElement("img");
+          preview.className = "send-preview";
+          preview.src = sourceImage.currentSrc || sourceImage.src;
+          preview.alt = "";
+          preview.setAttribute("aria-hidden", "true");
+          preview.style.left = `${rect.left}px`;
+          preview.style.top = `${rect.top}px`;
+          preview.style.width = `${rect.width}px`;
+          preview.style.height = `${rect.height}px`;
+          document.body.append(preview);
+
+          const travel = Math.max(150, rect.top + rect.height + 40);
+          const animation = preview.animate([
+            { transform: "translate3d(0, 0, 0) scale(1) rotate(0deg)", opacity: 1 },
+            { transform: `translate3d(0, -${travel}px, 0) scale(.42) rotate(9deg)`, opacity: 0 }
+          ], {
+            duration: 1100,
+            easing: "cubic-bezier(.2, .72, .25, 1)",
+            fill: "forwards"
+          });
+          animation.addEventListener("finish", () => preview.remove(), { once: true });
+        }
+
+      function drawHand(landmarks) {
+        handCtx.clearRect(0, 0, width, height);
+        if (!landmarks) return;
+        handCtx.save();
+        handCtx.lineWidth = 3;
+        handCtx.lineCap = "round";
+        handCtx.strokeStyle = "rgba(185, 243, 106, .76)";
+        for (const [start, end] of handConnections) {
+          const a = landmarks[start];
+          const b = landmarks[end];
+          handCtx.beginPath();
+          handCtx.moveTo((1 - a.x) * width, a.y * height);
+          handCtx.lineTo((1 - b.x) * width, b.y * height);
+          handCtx.stroke();
+        }
+        for (let index = 0; index < landmarks.length; index++) {
+          const point = landmarks[index];
+          const x = (1 - point.x) * width;
+          const y = point.y * height;
+          const isTip = [4, 8, 12, 16, 20].includes(index);
+          handCtx.beginPath();
+          handCtx.fillStyle = isTip ? "#d9ff9d" : "#8fe64f";
+          handCtx.shadowColor = "rgba(185, 243, 106, .85)";
+          handCtx.shadowBlur = isTip ? 13 : 8;
+          handCtx.arc(x, y, isTip ? 5 : 3.5, 0, Math.PI * 2);
+          handCtx.fill();
+        }
+        handCtx.restore();
+      }
+
+      function onResults(results) {
+        const landmarks = results.multiHandLandmarks?.[0] || null;
+        drawHand(landmarks);
+        updateGestureTarget(landmarks);
+        if (grabbedCard && landmarks) {
+          const palm = landmarks[9];
+          const stageRect = cameraStage.getBoundingClientRect();
+          grabbedImage.style.left = `${(1 - palm.x) * stageRect.width}px`;
+          grabbedImage.style.top = `${palm.y * stageRect.height}px`;
+          grabbedImage.hidden = false;
+        } else {
+          grabbedImage.hidden = true;
+        }
+        if (!landmarks) {
+          pendingGesture = "none";
+          pendingGestureFrames = 0;
+          stableGesture = "none";
+          gestureIndicator.textContent = "NO HAND";
+          lastGesture = "none";
+          setStatus("no-hand", "No Hand Detected", grabbedCard ? `${getFileName(grabbedCard)} is selected. Show an open palm to send.` : "Place one hand in the camera view.", "Tracking active", "◎");
+          return;
+        }
+
+        const gesture = stabilizeGesture(classifyHand(landmarks));
+        if (!gesture) {
+          gestureIndicator.textContent = "HOLD STEADY";
+          setStatus("other", "Hand Detected", "Hold a fist or open palm steady for a moment.", "Recognizing gesture", "✋");
+          return;
+        }
+        gestureIndicator.textContent = gesture === "closed" ? "CLOSED FIST" : gesture === "open" ? "OPEN PALM" : "HAND DETECTED";
+        if (gesture === "closed") {
+          if (!grabbedCard && activeFileCard) grabCard(activeFileCard);
+          else if (grabbedCard) setStatus("grabbed", "✊ CLOSED FIST (Grab File)", `${getFileName(grabbedCard)} selected. Open your palm to send it.`, "File selected", "✊");
+          else setStatus("closed", "✊ CLOSED FIST (Grab File)", "Move your hand left or right over an image, then make a fist to grab it.", "No file selected", "✊");
+        } else if (gesture === "open") {
+          if (grabbedCard) sendCard(grabbedCard);
+          else if (sentResetTimer) {
+            const sentCard = fileCards.find((card) => card.classList.contains("sent"));
+            setStatus("sent", "✋ OPEN PALM (Ready to Copy/Paste)", `${getFileName(sentCard)} sent into the air.`, "File sent", "✋");
+          }
+          else if (activeFileCard) {
+            showTransferPreview(activeFileCard, "ready");
+            setStatus("open", "✋ OPEN PALM (Ready to Copy/Paste)", `${getFileName(activeFileCard)} is ready to copy/paste.`, "Ready to copy/paste", "✋");
+          } else setStatus("open", "✋ OPEN PALM (Ready to Copy/Paste)", "Hover a file and make a fist to grab it.", "Ready to copy/paste", "✋");
+        } else if (grabbedCard) {
+          setStatus("grabbed", "✊ CLOSED FIST (Grab File)", `Keep your fist closed, then open your palm to send ${getFileName(grabbedCard)}.`, "File selected", "✊");
+        } else {
+          setStatus("other", "Hand Detected", "Show a clear fist or open palm to continue.", "Gesture not recognized", "✋");
+        }
+        lastGesture = gesture;
+      }
+
+      function resizeParticleCanvas() {
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        particleCanvas.width = Math.round(window.innerWidth * pixelRatio);
+        particleCanvas.height = Math.round(window.innerHeight * pixelRatio);
+        particleCanvas.style.width = `${window.innerWidth}px`;
+        particleCanvas.style.height = `${window.innerHeight}px`;
+        particleCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      }
+
+      function spawnBurst(card) {
+        const rect = card.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height * .42;
+        const colors = ["#b9f36a", "#6ee7b7", "#f2ffb5", "#ffd17a", "#f6fff0"];
+        for (let index = 0; index < 74; index++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 1.5 + Math.random() * 6;
+          particles.push({
+            x: centerX,
+            y: centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1.5,
+            size: 2 + Math.random() * 4.5,
+            rotation: Math.random() * Math.PI,
+            spin: (Math.random() - .5) * .2,
+            life: 48 + Math.random() * 36,
+            maxLife: 84,
+            color: colors[Math.floor(Math.random() * colors.length)]
+          });
+        }
+        if (!particleFrame) particleFrame = requestAnimationFrame(animateParticles);
+      }
+
+      function animateParticles() {
+        particleFrame = 0;
+        particleCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        particles = particles.filter((particle) => particle.life > 0);
+        for (const particle of particles) {
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+          particle.vy += .075;
+          particle.vx *= .987;
+          particle.rotation += particle.spin;
+          particle.life--;
+          const opacity = Math.min(1, particle.life / 18, particle.life / particle.maxLife * 1.8);
+          particleCtx.save();
+          particleCtx.globalAlpha = opacity;
+          particleCtx.translate(particle.x, particle.y);
+          particleCtx.rotate(particle.rotation);
+          particleCtx.fillStyle = particle.color;
+          particleCtx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size * 1.7);
+          particleCtx.restore();
+        }
+        if (particles.length) particleFrame = requestAnimationFrame(animateParticles);
+      }
+
+      async function startCamera() {
+        if (cameraStarting || cameraStream) return;
+        cameraStarting = true;
+        cameraButton.disabled = true;
+        cameraButton.querySelector("span").textContent = "Starting camera…";
+        cameraError.textContent = "";
+        try {
+          if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error("Camera access is unavailable. Open this page on HTTPS or localhost in a supported browser.");
+          }
+          if (!window.Hands || !window.Camera) {
+            throw new Error("MediaPipe could not load. Check your internet connection, then reload the page.");
+          }
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
+          });
+          video.srcObject = cameraStream;
+          await video.play();
+          cameraStage.classList.add("has-camera");
+          hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+          });
+          hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.65,
+            minTrackingConfidence: 0.55
+          });
+          hands.onResults(onResults);
+          camera = new Camera(video, {
+            onFrame: async () => {
+              if (hands) await hands.send({ image: video });
+            },
+            width,
+            height
+          });
+          await camera.start();
+          cameraState.textContent = "Camera active";
+          cameraLiveLabel.textContent = "LIVE TRACKING";
+          cameraLiveDot.style.background = "var(--green)";
+          cameraButton.querySelector("span").textContent = "Camera enabled";
+          cameraButton.disabled = true;
+          setStatus("no-hand", "No Hand Detected", "Place one hand in the camera view.", "Tracking active", "◎");
+        } catch (error) {
+          if (cameraStream) {
+            for (const track of cameraStream.getTracks()) track.stop();
+            cameraStream = null;
+          }
+          cameraStage.classList.remove("has-camera");
+          const message = error?.name === "NotAllowedError"
+            ? "Camera permission was blocked. Allow camera access in your browser settings and try again."
+            : error?.name === "NotFoundError"
+              ? "No camera was found on this device."
+              : (error?.message || "Could not start the camera.");
+          cameraError.textContent = message;
+          cameraState.textContent = "Camera unavailable";
+          cameraLiveLabel.textContent = "CAMERA UNAVAILABLE";
+          cameraLiveDot.style.background = "var(--red)";
+          setStatus("no-hand", "No Hand Detected", message, "Camera unavailable", "◎");
+          cameraButton.querySelector("span").textContent = "Try again";
+          cameraButton.disabled = false;
+        } finally {
+          cameraStarting = false;
+        }
+      }
+
+      function bindFileCard(card) {
+        card.addEventListener("click", () => {
+          hoveredCard = card;
+          if (grabbedCard !== card) grabCard(card);
+        });
+        card.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            card.click();
+          }
+        });
+        card.addEventListener("pointerenter", () => {
+          hoveredCard = card;
+          resetSentCard(card);
+          if (!grabbedCard && !sentResetTimer) {
+            activeFileCard = card;
+            showTransferPreview(card, "preview");
+          }
+        });
+        card.addEventListener("pointerleave", () => {
+          if (hoveredCard === card) hoveredCard = null;
+        });
+        card.addEventListener("focus", () => {
+          hoveredCard = card;
+          if (!grabbedCard && !sentResetTimer) {
+            activeFileCard = card;
+            showTransferPreview(card, "preview");
+          }
+        });
+        card.addEventListener("blur", () => {
+          if (hoveredCard === card) hoveredCard = null;
+        });
+      }
+
+      for (const card of fileCards) bindFileCard(card);
+
+      addImagesButton.addEventListener("click", () => imageInput.click());
+      transferSendButton.addEventListener("click", () => sendCard(grabbedCard));
+      saveReceivedFileButton.addEventListener("click", saveReceivedFile);
+      connectRoomButton.addEventListener("click", connectToRoom);
+      disconnectRoomButton.addEventListener("click", disconnectFromRoom);
+      copyRoomCodeButton.addEventListener("click", copyRoomCode);
+      roomCodeInput.value = generateRoomCode();
+      roomCodeInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") connectToRoom();
+      });
+      imageInput.addEventListener("change", () => {
+        const selectedFiles = [...imageInput.files];
+        for (const file of selectedFiles) {
+          const card = createFileCard(file);
+          fileGrid.append(card);
+          bindFileCard(card);
+        }
+        if (selectedFiles.length) {
+          fileCards = [...fileGrid.querySelectorAll(".file-card")];
+          fileCount.textContent = `${fileCards.length} items`;
+          setStatus("open", "Files added", `${selectedFiles.length} file${selectedFiles.length === 1 ? "" : "s"} ready to select.`, "Choose a file", "＋");
+        }
+        imageInput.value = "";
+      });
+
+      cameraButton.addEventListener("click", startCamera);
+      window.addEventListener("resize", resizeParticleCanvas);
+      resizeParticleCanvas();
+    })();
+  </script>
+</body>
+</html>
